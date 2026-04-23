@@ -2,9 +2,11 @@
  * lib/salesforce/profiles.ts — profile lookup + fuzzy match (A2)
  *
  * Pure(-ish) module for resolving a user-supplied profile name against
- * the two orgs. Queries each org's Profile entity for Name AND Label,
- * runs a case-insensitive exact match first, and falls back to fuzzy
- * scoring to surface up to 5 suggestions from the union of both orgs.
+ * the two orgs. Queries each org's Profile entity for Name (Salesforce's
+ * `Profile` sObject has no `Label` column — `Name` is the display
+ * value for both standard and custom profiles), runs a case-insensitive
+ * exact match first, and falls back to fuzzy scoring to surface up to 5
+ * suggestions from the union of both orgs.
  *
  * The scoring function is intentionally simple — a length-normalized
  * Levenshtein distance, boosted by substring containment and token
@@ -117,10 +119,14 @@ async function lookupInOrg(
   profileName: string,
 ): Promise<SingleOrgMatch> {
   const client = getClient(org);
-  const res = await client.query<ToolingQueryResponse<ProfileRecord>>(
-    "SELECT Id, Name, Label FROM Profile",
+  const res = await client.query<ToolingQueryResponse<{ Id: string; Name: string }>>(
+    "SELECT Id, Name FROM Profile",
   );
-  const all = res.records ?? [];
+  const all: ProfileRecord[] = (res.records ?? []).map((r) => ({
+    Id: r.Id,
+    Name: r.Name,
+    Label: r.Name,
+  }));
   const needle = profileName.trim().toLowerCase();
   const exact =
     all.find(
