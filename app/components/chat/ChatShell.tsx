@@ -15,6 +15,14 @@
 import { useChat } from "ai/react";
 import { useEffect, useRef } from "react";
 import { Message } from "./Message";
+import type { PermissionCategory } from "@/lib/salesforce/types";
+
+const CATEGORY_LABELS: Record<PermissionCategory, string> = {
+  object_settings: "Object Settings",
+  system_permissions: "System Permissions",
+  app_permissions: "App Permissions",
+  apex_class_access: "Apex Class Access",
+};
 
 export function ChatShell() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } =
@@ -37,9 +45,14 @@ export function ChatShell() {
     append({ role: "user", content: profileName });
   };
 
-  // Comparison-type card callback (C2).
-  const onCategoryPick = (category: string) => {
-    append({ role: "user", content: `Use comparison type: ${category}` });
+  // Comparison-type card callback (C2). We echo the friendly label back
+  // so the LLM can see which category the user picked and call the
+  // right tool on the next turn.
+  const onCategoryPick = (category: PermissionCategory) => {
+    append({
+      role: "user",
+      content: `I'll compare ${CATEGORY_LABELS[category]} (category=${category}).`,
+    });
   };
 
   // Object picker confirm (C3).
