@@ -17,9 +17,29 @@
  * budget + two sequential Salesforce round trips, per the epic risk.
  */
 
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { buildTools } from "@/lib/ai/tools";
+
+// Prefer Vercel AI Gateway when AI_GATEWAY_API_KEY is set — routes through
+// https://ai-gateway.vercel.sh/v1 and speaks the OpenAI chat-completions
+// protocol, so @ai-sdk/openai v0.0.66 works unchanged (aside from the
+// `provider/model` prefix on the model string). Falls back to direct
+// OpenAI when only OPENAI_API_KEY is set.
+const gatewayKey = process.env.AI_GATEWAY_API_KEY;
+const openaiKey = process.env.OPENAI_API_KEY;
+
+const provider = gatewayKey
+  ? createOpenAI({
+      apiKey: gatewayKey,
+      baseURL: "https://ai-gateway.vercel.sh/v1",
+    })
+  : openaiKey
+    ? createOpenAI({ apiKey: openaiKey })
+    : null;
+
+// Gateway requires `provider/model`; direct OpenAI takes the bare model id.
+const modelId = gatewayKey ? "openai/gpt-4o-mini" : "gpt-4o-mini";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,11 +72,11 @@ Rules:
 - Only one comparison category per conversation.`;
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!provider) {
     return new Response(
       JSON.stringify({
         error:
-          "OpenAI API key not configured. Set OPENAI_API_KEY to enable chat.",
+          "No LLM credentials configured. Set AI_GATEWAY_API_KEY (Vercel AI Gateway) or OPENAI_API_KEY.",
       }),
       {
         status: 500,
@@ -84,7 +104,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await streamText({
-      model: openai("gpt-4o-mini"),
+      model: provider(modelId),
       system: SYSTEM_PROMPT,
       messages,
       tools,
