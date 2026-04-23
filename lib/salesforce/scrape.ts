@@ -140,6 +140,7 @@ async function scrapeObjectSettings(
   const soql = objectSettingsQuery(profileName, selectedObjects);
   const res = await client.query<ToolingQueryResponse<ObjectPermissionRecord>>(
     soql,
+    { endpoint: "data" },
   );
   return res.records.map((r) => ({
     key: r.SobjectType,
@@ -162,6 +163,7 @@ async function scrapeSystemPermissions(
   const soql = systemPermissionsQuery(profileName);
   const res = await client.query<ToolingQueryResponse<SystemPermissionRecord>>(
     soql,
+    { endpoint: "data" },
   );
   const permissionSet = res.records[0];
   if (!permissionSet) return [];
