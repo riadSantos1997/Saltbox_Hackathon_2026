@@ -68,10 +68,13 @@ export const SYSTEM_PERMISSION_FIELDS: readonly string[] = [
   "PermissionsPasswordNeverExpires",
 ];
 
-export function systemPermissionsQuery(profileName: string): string {
-  const fields = ["Id", ...SYSTEM_PERMISSION_FIELDS].join(", ");
+export function systemPermissionsQuery(
+  profileName: string,
+  fields: readonly string[] = SYSTEM_PERMISSION_FIELDS,
+): string {
+  const selectFields = ["Id", ...fields].join(", ");
   return (
-    `SELECT ${fields} FROM PermissionSet ` +
+    `SELECT ${selectFields} FROM PermissionSet ` +
     `WHERE IsOwnedByProfile = true AND Profile.Name = '${esc(profileName)}'`
   );
 }

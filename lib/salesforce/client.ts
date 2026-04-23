@@ -14,6 +14,7 @@
 import { readSession } from "./session";
 import {
   SessionExpiredError,
+  type DescribeResult,
   type OrgId,
   type OrgSession,
   type QueryEndpoint,
@@ -34,7 +35,31 @@ export function getClient(org: OrgId): SalesforceClient {
     org,
     query: <T = unknown>(soql: string, opts?: QueryOptions) =>
       runQuery<T>(session, soql, opts?.endpoint ?? "tooling"),
+    describe: (sobject: string) => runDescribe(session, sobject),
   };
+}
+
+async function runDescribe(
+  session: OrgSession,
+  sobject: string,
+): Promise<DescribeResult> {
+  const url = `https://${session.domain}/services/data/${session.apiVersion}/sobjects/${encodeURIComponent(sobject)}/describe/`;
+  const res = await fetchWithTimeout(url, {
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new SessionExpiredError(session.org);
+  }
+  if (!res.ok) {
+    const body = await safeReadText(res);
+    throw new Error(
+      `Salesforce describe failed (Org ${session.org}, status ${res.status}): ${body}`,
+    );
+  }
+  return (await res.json()) as DescribeResult;
 }
 
 async function runQuery<T>(

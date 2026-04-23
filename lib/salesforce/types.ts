@@ -85,11 +85,22 @@ export interface QueryOptions {
   endpoint?: QueryEndpoint;
 }
 
+/** Subset of the `describe` response we consume — field names + types. */
+export interface DescribeResult {
+  fields: { name: string; type: string }[];
+}
+
 /** A minimal Salesforce query client exposed by `getClient(org)`. */
 export interface SalesforceClient {
   org: OrgId;
   /** Issue a SOQL query. Defaults to the Tooling API endpoint. */
   query<T = unknown>(soql: string, opts?: QueryOptions): Promise<T>;
+  /**
+   * Describe a standard sObject via the REST Data API. Used to discover
+   * which `Permissions*` fields actually exist on this org's edition so
+   * we don't INVALID_FIELD on edition-specific permission columns.
+   */
+  describe(sobject: string): Promise<DescribeResult>;
 }
 
 /**

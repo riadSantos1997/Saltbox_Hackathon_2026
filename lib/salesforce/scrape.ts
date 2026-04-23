@@ -160,7 +160,12 @@ async function scrapeSystemPermissions(
   client: SalesforceClient,
   profileName: string,
 ): Promise<PermissionRow[]> {
-  const soql = systemPermissionsQuery(profileName);
+  // Salesforce editions differ in which Permissions* columns exist on
+  // PermissionSet. Describe first, then intersect our curated list with
+  // what the org actually exposes — otherwise we INVALID_FIELD on the
+  // first missing column and the whole scrape fails.
+  const availableFields = await availableSystemPermissionFields(client);
+  const soql = systemPermissionsQuery(profileName, availableFields);
   const res = await client.query<ToolingQueryResponse<SystemPermissionRecord>>(
     soql,
     { endpoint: "data" },
@@ -168,8 +173,8 @@ async function scrapeSystemPermissions(
   const permissionSet = res.records[0];
   if (!permissionSet) return [];
 
-  // Flatten the curated system-permission flags into one row per flag.
-  return SYSTEM_PERMISSION_FIELDS.map((field): PermissionRow => {
+  // Flatten the surviving flags into one row per flag.
+  return availableFields.map((field): PermissionRow => {
     const enabled = Boolean(permissionSet[field]);
     return {
       key: stripPermissionsPrefix(field),
@@ -177,6 +182,30 @@ async function scrapeSystemPermissions(
       values: { Enabled: enabled },
     };
   });
+}
+
+/**
+ * Intersect our curated SYSTEM_PERMISSION_FIELDS with the fields the org
+ * actually exposes on PermissionSet. Salesforce editions add/drop
+ * Permissions* columns (e.g. PermissionsManageDashboards is absent in
+ * some dev orgs), and an unknown field in the SELECT list aborts the
+ * whole query with INVALID_FIELD. If describe fails, fall back to the
+ * curated list — the query may still fail, but we've not made it worse.
+ */
+async function availableSystemPermissionFields(
+  client: SalesforceClient,
+): Promise<readonly string[]> {
+  try {
+    const d = await client.describe("PermissionSet");
+    const orgFields = new Set(d.fields.map((f) => f.name));
+    return SYSTEM_PERMISSION_FIELDS.filter((f) => orgFields.has(f));
+  } catch (err) {
+    console.warn(
+      `[scrapeSystemPermissions] describe PermissionSet failed for Org ${client.org}; using curated list.`,
+      err,
+    );
+    return SYSTEM_PERMISSION_FIELDS;
+  }
 }
 
 async function scrapeAppPermissions(
