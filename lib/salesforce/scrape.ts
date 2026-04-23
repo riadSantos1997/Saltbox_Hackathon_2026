@@ -191,17 +191,26 @@ async function scrapeAppPermissions(
 
   const setupEntityIds = res.records.map((r) => r.SetupEntityId);
   // Hydrate TabSet metadata. AppDefinition.DurableId is the join key.
+  // Some org editions don't expose AppDefinition on any query endpoint —
+  // fall back to raw DurableIds in that case so the comparison still runs.
   let labelByDurableId = new Map<string, string>();
   if (setupEntityIds.length > 0) {
     const lookup = tabSetLookupQuery(setupEntityIds);
     if (lookup) {
-      const meta = await client.query<ToolingQueryResponse<TabSetRecord>>(lookup);
-      labelByDurableId = new Map(
-        meta.records.map((m) => [
-          m.DurableId,
-          m.Namespace ? `${m.Namespace}__${m.Label}` : m.Label,
-        ]),
-      );
+      try {
+        const meta = await client.query<ToolingQueryResponse<TabSetRecord>>(lookup);
+        labelByDurableId = new Map(
+          meta.records.map((m) => [
+            m.DurableId,
+            m.Namespace ? `${m.Namespace}__${m.Label}` : m.Label,
+          ]),
+        );
+      } catch (err) {
+        console.warn(
+          `[scrapeAppPermissions] AppDefinition hydration failed for Org ${client.org}; using raw DurableIds.`,
+          err,
+        );
+      }
     }
   }
 
@@ -230,15 +239,22 @@ async function scrapeApexClassAccess(
   if (classIds.length > 0) {
     const lookup = apexClassLookupQuery(classIds);
     if (lookup) {
-      const meta = await client.query<ToolingQueryResponse<ApexClassRecord>>(
-        lookup,
-      );
-      nameById = new Map(
-        meta.records.map((m) => [
-          m.Id,
-          m.NamespacePrefix ? `${m.NamespacePrefix}__${m.Name}` : m.Name,
-        ]),
-      );
+      try {
+        const meta = await client.query<ToolingQueryResponse<ApexClassRecord>>(
+          lookup,
+        );
+        nameById = new Map(
+          meta.records.map((m) => [
+            m.Id,
+            m.NamespacePrefix ? `${m.NamespacePrefix}__${m.Name}` : m.Name,
+          ]),
+        );
+      } catch (err) {
+        console.warn(
+          `[scrapeApexClassAccess] ApexClass hydration failed for Org ${client.org}; using raw class IDs.`,
+          err,
+        );
+      }
     }
   }
 
