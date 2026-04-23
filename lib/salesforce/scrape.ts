@@ -184,6 +184,7 @@ async function scrapeAppPermissions(
   const soql = appPermissionsQuery(profileName);
   const res = await client.query<ToolingQueryResponse<SetupEntityAccessRecord>>(
     soql,
+    { endpoint: "data" },
   );
 
   const setupEntityIds = res.records.map((r) => r.SetupEntityId);
@@ -219,6 +220,7 @@ async function scrapeApexClassAccess(
   const soql = apexClassAccessQuery(profileName);
   const res = await client.query<ToolingQueryResponse<SetupEntityAccessRecord>>(
     soql,
+    { endpoint: "data" },
   );
 
   const classIds = res.records.map((r) => r.SetupEntityId);

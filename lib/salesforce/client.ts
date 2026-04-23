@@ -16,6 +16,8 @@ import {
   SessionExpiredError,
   type OrgId,
   type OrgSession,
+  type QueryEndpoint,
+  type QueryOptions,
   type SalesforceClient,
 } from "./types";
 
@@ -30,15 +32,17 @@ export function getClient(org: OrgId): SalesforceClient {
   const session = readSession(org);
   return {
     org,
-    query: <T = unknown>(soql: string) => runToolingQuery<T>(session, soql),
+    query: <T = unknown>(soql: string, opts?: QueryOptions) =>
+      runQuery<T>(session, soql, opts?.endpoint ?? "tooling"),
   };
 }
 
-async function runToolingQuery<T>(
+async function runQuery<T>(
   session: OrgSession,
   soql: string,
+  endpoint: QueryEndpoint,
 ): Promise<T> {
-  const url = buildToolingUrl(session, soql);
+  const url = buildQueryUrl(session, soql, endpoint);
   const res = await fetchWithTimeout(url, {
     headers: {
       Authorization: `Bearer ${session.accessToken}`,
@@ -59,9 +63,14 @@ async function runToolingQuery<T>(
   return (await res.json()) as T;
 }
 
-function buildToolingUrl(session: OrgSession, soql: string): string {
+function buildQueryUrl(
+  session: OrgSession,
+  soql: string,
+  endpoint: QueryEndpoint,
+): string {
   const encoded = encodeURIComponent(soql);
-  return `https://${session.domain}/services/data/${session.apiVersion}/tooling/query/?q=${encoded}`;
+  const path = endpoint === "tooling" ? "tooling/query" : "query";
+  return `https://${session.domain}/services/data/${session.apiVersion}/${path}/?q=${encoded}`;
 }
 
 async function fetchWithTimeout(

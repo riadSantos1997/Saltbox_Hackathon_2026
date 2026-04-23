@@ -73,11 +73,23 @@ export interface OrgSession {
   apiVersion: string;
 }
 
+/** Which Salesforce REST surface a query targets. */
+export type QueryEndpoint = "tooling" | "data";
+
+export interface QueryOptions {
+  /**
+   * Endpoint to route the SOQL through. Defaults to "tooling" (legacy
+   * behavior). Use "data" for standard sObjects that the Tooling API
+   * does not expose — notably `SetupEntityAccess`.
+   */
+  endpoint?: QueryEndpoint;
+}
+
 /** A minimal Salesforce query client exposed by `getClient(org)`. */
 export interface SalesforceClient {
   org: OrgId;
-  /** Issue a SOQL query against the Tooling API. Returns the parsed JSON. */
-  query<T = unknown>(soql: string): Promise<T>;
+  /** Issue a SOQL query. Defaults to the Tooling API endpoint. */
+  query<T = unknown>(soql: string, opts?: QueryOptions): Promise<T>;
 }
 
 /**
